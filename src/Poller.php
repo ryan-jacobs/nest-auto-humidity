@@ -28,6 +28,13 @@ class Poller {
    */
   private $thermostats;
   
+  /**
+   * Structure data for caching purposes.
+   *
+   * @var array
+   */
+  private $structures;
+  
   
   /**
    * Factory
@@ -76,6 +83,23 @@ class Poller {
       }
     }
     return $this->thermostats;
+  }
+  
+  /**
+   * Utility to get and cache structure data including weather.
+   *
+   * The Nest API may perform some redundant remote REST requests upon each
+   * getUserLocations() call, such as weather lookups, so this method wraps that
+   * call with some caching.
+   *
+   * @return array
+   *   Indexed array of structure data.
+   */
+  private function getStructures() {
+    if (!$this->structures) {
+      $this->structures = $this->nest->getUserLocations();
+    }
+    return $this->structures;
   }
 
   /**
