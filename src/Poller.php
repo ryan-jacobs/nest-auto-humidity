@@ -10,7 +10,7 @@ class Poller {
   /**
    * Nest object.
    *
-   * @var \Nest
+   * @var Nest
    */
   private $nest;
 
@@ -27,29 +27,29 @@ class Poller {
    * @var array
    */
   private $thermostats;
-  
+
   /**
    * Structure data for caching purposes.
    *
    * @var array
    */
   private $structures;
-  
-  
+
+
   /**
    * Factory
    */
   public static function create() {
     $settings = \Spyc::YAMLLoad(realpath(__DIR__ . '/../conf/settings.yml'));
     $nest_settings = $settings['nest'];
-    $nest = new \Nest($nest_settings['username'], $nest_settings['password']);
+    $nest = new Nest($nest_settings['username'], $nest_settings['password']);
     return new static($nest, $settings);
   }
 
   /**
    * Constructor
    */
-  public function __construct(\Nest $nest, $settings) {
+  public function __construct(Nest $nest, array $settings) {
     $this->nest = $nest;
     $this->settings = $settings;
   }
@@ -58,11 +58,11 @@ class Poller {
    * Poll base structure and device conf.
    */
   public function poll() {
-    // Update thermostat data.
     $devices = $this->getThermostats();
     foreach ($devices as $device_info) {
       print $device_info->serial_number;
     }
+    $structures = $this->getStructures();
   }
 
   /**
@@ -84,7 +84,7 @@ class Poller {
     }
     return $this->thermostats;
   }
-  
+
   /**
    * Utility to get and cache structure data including weather.
    *
@@ -125,5 +125,5 @@ class Poller {
     }
     return $temp;
   }
-  
+
 }
