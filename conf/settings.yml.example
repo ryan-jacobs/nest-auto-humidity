@@ -1,3 +1,13 @@
 nest:
   username: ****
   password: ****
+latency_days: 2
+steps:
+  default:
+    -20: 10
+    -10: 15
+    0: 20
+    10: 25
+    20: 30
+    30: 35
+    40: 40

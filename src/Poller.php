@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Poller utilities and tools
  */
@@ -35,7 +36,6 @@ class Poller {
    */
   private $structures;
 
-
   /**
    * Factory
    */
@@ -58,11 +58,63 @@ class Poller {
    * Poll base structure and device conf.
    */
   public function poll() {
-    $devices = $this->getThermostats();
-    foreach ($devices as $device_info) {
-      print $device_info->serial_number;
-    }
     $structures = $this->getStructures();
+    $thermostats = $this->getThermostats();
+    foreach ($structures as $structure) {
+      $benchmark_temp = $this->getBenchmarkTemp($structure);
+      foreach ($structure->thermostats as $thermostat_id) {
+        if (isset($thermostats[$thermostat_id])) {
+          // Calculate and set target humidity.
+          $this->nest->setHumidity($this->getTargetHumidity($thermostat_id, $benchmark_temp), $thermostat_id);
+        }
+      }
+    }
+  }
+
+  /**
+   * Utility to get bencmark temperature for a structure.
+   *
+   * @param stdObject $structure
+   *   Structure data as returned from the Nest API.
+   * @return float
+   *   The calculated benchmark temp for the structure.
+   */
+  protected function getBenchmarkTemp($structure) {
+    // Calaculate the lowest temp predicted between now and the number of
+    // latency days configured.
+    $benchmark = $structure->outside_temperature;
+    if (!empty($this->settings['latency_days'])) {
+      foreach ($structure->outside_forecast->daily as $key => $day) {
+        if ($key + 1 > $this->settings['latency_days']) {
+          break;
+        }
+        if ($day->low_temperature < $benchmark) {
+          $benchmark = $day->low_temperature;
+        }
+      }
+    }
+    return $benchmark;
+  }
+
+  /**
+   * Utility to get target humidity based on benchmark temp.
+   *
+   * @param string $thermostat_id
+   *   The UUID of a thermostat.
+   * @param float $benchmark_temp
+   *   The benchmark temp to use when calculating correct humidity step.
+   * @return float
+   *   The calculated target humidity for the thermostat.
+   */
+  protected function getTargetHumidity($thermostat_id, $benchmark_temp) {
+    $target_humidity = 0;
+    $steps = isset($this->settings['steps'][$thermostat_id]) ? $this->settings['steps'][$thermostat_id] : $this->settings['steps']['default'];
+    foreach ($steps as $temp => $target_step) {
+      if ($benchmark_temp > $temp) {
+        $target_humidity = $target_step;
+      }
+    }
+    return $target_humidity;
   }
 
   /**
@@ -100,30 +152,6 @@ class Poller {
       $this->structures = $this->nest->getUserLocations();
     }
     return $this->structures;
-  }
-
-  /**
-   * Utility to get celsius temperature independent of the user's scale.
-   *
-   * When fetching tempatures the Nest API always returns values in the user's
-   * scale. However, we want to store everything in a standard celsius and then
-   * convert at dispaly time.
-   *
-   * @param float $temp
-   *   The temperature specified in the user's scale.
-   * @param string $serial_number
-   *   The serial number of the thermostat that this temperature value came
-   *   from. This is needed to determine the user's scale. If NULL the scale of
-   *   the first thermostat will be used.
-   * @return float
-   *   The temperature in celsius.
-   */
-  private function temp($temp, $serial_number = NULL) {
-    $temp_scale = $this->nest->getDeviceTemperatureScale($serial_number);
-    if ($temp_scale == 'F') {
-      $temp = 5/9 * ($temp - 32);
-    }
-    return $temp;
   }
 
 }
