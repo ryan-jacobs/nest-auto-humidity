@@ -65,10 +65,47 @@ class Poller {
       foreach ($structure->thermostats as $thermostat_id) {
         if (isset($thermostats[$thermostat_id])) {
           // Calculate and set target humidity.
-          $this->nest->setHumidity($this->getTargetHumidity($thermostat_id, $benchmark_temp), $thermostat_id);
+          $target = $this->getTargetHumidity($thermostat_id, $benchmark_temp);
+          $this->nest->setHumidity($target, $thermostat_id);
         }
       }
     }
+  }
+  
+  /**
+   * Get current state info.
+   */
+  public function info() {
+    // Add global info.
+    $info = array(
+      'default_steps' => $this->settings['steps']['default'],
+      'latency_days' => $this->settings['latency_days'],
+    );
+    $structures = $this->getStructures();
+    $thermostats = $this->getThermostats();
+    // Add structure-specific info.
+    foreach ($structures as $structure_key => $structure) {
+      $benchmark_temp = $this->getBenchmarkTemp($structure);
+      $info['structures'][$structure_key] = array(
+        'name' => $structure->name,
+        'benchmark_temp' => $benchmark_temp,
+      );
+      // Add device-specific info.
+      foreach ($structure->thermostats as $thermostat_id) {
+        if (isset($thermostats[$thermostat_id])) {
+          $info['structures'][$structure_key]['thermostats'][$thermostat_id] = array(
+            'where' => $thermostats[$thermostat_id]->where,
+            'current_humidity' => $thermostats[$thermostat_id]->current_state->humidity,
+            'current_set_target_humidity' => $thermostats[$thermostat_id]->target->humidity,
+            'calculated_target_humidity' => $this->getTargetHumidity($thermostat_id, $benchmark_temp),
+          );
+          if (isset($this->settings['steps'][$thermostat_id])) {
+            $info['structures'][$structure_key]['thermostats'][$thermostat_id]['steps'] = $this->settings['steps'][$thermostat_id];
+          }
+        }
+      }
+    }
+    return $info;
   }
 
   /**
@@ -109,9 +146,13 @@ class Poller {
   protected function getTargetHumidity($thermostat_id, $benchmark_temp) {
     $target_humidity = 0;
     $steps = isset($this->settings['steps'][$thermostat_id]) ? $this->settings['steps'][$thermostat_id] : $this->settings['steps']['default'];
+    ksort($steps);
     foreach ($steps as $temp => $target_step) {
       if ($benchmark_temp > $temp) {
         $target_humidity = $target_step;
+      }
+      else {
+        break;
       }
     }
     return $target_humidity;
