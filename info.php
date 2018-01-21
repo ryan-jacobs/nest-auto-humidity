@@ -13,6 +13,5 @@ catch (Exception $exc) {
 $info = $poller->info();
 $date = date(DATE_RSS);
 ?>
-<h2>State Summary</h2>
-<p>The following raw data has been dumped from polling calculations on <?php print $date ?></p>
+The following raw data has been dumped from polling calculations on <?php print $date ?>
 <pre><?php print_r($info) ?></pre>

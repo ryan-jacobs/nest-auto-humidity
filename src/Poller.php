@@ -121,6 +121,14 @@ class Poller {
     // latency days configured.
     $benchmark = $structure->outside_temperature;
     if (!empty($this->settings['latency_days'])) {
+      // Check hourly lows as they are not always accuratly reflected in the
+      // daily low temp values)
+      foreach ($structure->outside_forecast->hourly as $key => $hour) {
+        if ($hour->temp < $benchmark) {
+          $benchmark = $hour->temp;
+        }
+      }
+      // Check daily forcast.
       foreach ($structure->outside_forecast->daily as $key => $day) {
         if ($key + 1 > $this->settings['latency_days']) {
           break;
