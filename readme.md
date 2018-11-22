@@ -1,8 +1,9 @@
 # Nest Auto Humidity (Condensation/Ice Prevention)
 
-For a smart device, a Nest thermostat is not very "smart" at managing humidity levels relative to exterior conditions in cold and dry weather. Nest allows users to set a static target humidity level but homes in very cold or irregular climates will benefit from a more variable humidity level that is relative to exterior temperature.<sup>[1](https://www.hvac.com/faq/recommended-humidity-level-home/), [2](http://www.startribune.com/fixit-what-is-the-ideal-winter-indoor-humidity-level/11468916/, [3](https://www.hunker.com/13416128/recommended-humidity-based-on-the-temperature-in-the-house)</sup>
+For a smart device, a Nest thermostat is not very "smart" at managing humidity levels relative to exterior conditions in cold and dry weather. Nest allows users to set a static target humidity level but homes in very cold or irregular climates will benefit from a more variable humidity level that is relative to exterior temperature.<sup>[1](https://www.hvac.com/faq/recommended-humidity-level-home/), [2](http://www.startribune.com/fixit-what-is-the-ideal-winter-indoor-humidity-level/11468916/), [3](https://www.hunker.com/13416128/recommended-humidity-based-on-the-temperature-in-the-house)</sup>
 
-This PHP project leverages the Nest API to track exterior temperatures and uses this information to automatically adjust interior humidity based on configurable steps. The goal is to lower the target interior humidity as exterior temperatures fall in order to prevent condensation, ice and other problems near exterior-facing surfaces. The process takes into account the future weather forecast in order to allow adequate time for humidity adjustments to take effect.
+This PHP project leverages the Nest API to track exterior temperatures and uses this information to automatically adjust interior humidity based on configurable steps. The goal is to lower the target interior humidity as exterior temperatures fall in order to prevent condensation, ice and other problems near exterior-facing surfaces. The process takes into account the future weather forecast to predict needed changes and allow adequate time for humidity adjustments to take effect.
+
 ## Dependencies
 
  * 2nd generation or later Nest thermostat wired to a whole-house humidifier
@@ -28,7 +29,7 @@ Set values as follows:
      * When the benchmark temperature (see above) moves from one step to another the associated relative humidity value for that step will be set on the thermostat.
      * Steps can be declared globally or on a thermostat-by-thermostat basis. To differentiate the step values used for a specific thermostat simply group the steps by that thermostat's Nest ID. Any thermostats without custom steps defined will use the "default" steps.
 
-Below is an example settings.yml file the declares custom steps for one thermostat (ID: 123456789) and default steps for all others (with fahrenheit scale):
+Below is an example `settings.yml` file the declares custom steps for one thermostat (ID: 123456789) and default steps for all others (with fahrenheit scale):
 
 ```
 nest:
