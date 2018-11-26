@@ -61,11 +61,11 @@ class Poller {
     $structures = $this->getStructures();
     $thermostats = $this->getThermostats();
     foreach ($structures as $structure) {
-      $benchmark_temp = $this->getBenchmarkTemp($structure);
+      $reference_temp = $this->getReferenceTemp($structure);
       foreach ($structure->thermostats as $thermostat_id) {
         if (isset($thermostats[$thermostat_id])) {
           // Calculate and set target humidity.
-          $target = $this->getTargetHumidity($thermostat_id, $benchmark_temp);
+          $target = $this->getTargetHumidity($thermostat_id, $reference_temp);
           $this->nest->setHumidity($target, $thermostat_id);
         }
       }
@@ -85,10 +85,10 @@ class Poller {
     $thermostats = $this->getThermostats();
     // Add structure-specific info.
     foreach ($structures as $structure_key => $structure) {
-      $benchmark_temp = $this->getBenchmarkTemp($structure);
+      $reference_temp = $this->getReferenceTemp($structure);
       $info['structures'][$structure_key] = array(
         'name' => $structure->name,
-        'benchmark_temp' => $benchmark_temp,
+        'reference_temp' => $reference_temp,
       );
       // Add device-specific info.
       foreach ($structure->thermostats as $thermostat_id) {
@@ -97,7 +97,7 @@ class Poller {
             'where' => $thermostats[$thermostat_id]->where,
             'current_humidity' => $thermostats[$thermostat_id]->current_state->humidity,
             'current_set_target_humidity' => $thermostats[$thermostat_id]->target->humidity,
-            'calculated_target_humidity' => $this->getTargetHumidity($thermostat_id, $benchmark_temp),
+            'calculated_target_humidity' => $this->getTargetHumidity($thermostat_id, $reference_temp),
           );
           if (isset($this->settings['steps'][$thermostat_id])) {
             $info['structures'][$structure_key]['thermostats'][$thermostat_id]['steps'] = $this->settings['steps'][$thermostat_id];
@@ -114,18 +114,18 @@ class Poller {
    * @param stdObject $structure
    *   Structure data as returned from the Nest API.
    * @return float
-   *   The calculated benchmark temp for the structure.
+   *   The calculated reference temp for the structure.
    */
-  protected function getBenchmarkTemp($structure) {
+  protected function getReferenceTemp($structure) {
     // Calaculate the lowest temp predicted between now and the number of
     // latency days configured.
-    $benchmark = $structure->outside_temperature;
+    $reference = $structure->outside_temperature;
     if (!empty($this->settings['latency_days'])) {
       // Check hourly lows as they are not always accuratly reflected in the
       // daily low temp values)
       foreach ($structure->outside_forecast->hourly as $key => $hour) {
-        if ($hour->temp < $benchmark) {
-          $benchmark = $hour->temp;
+        if ($hour->temp < $reference) {
+          $reference = $hour->temp;
         }
       }
       // Check daily forcast.
@@ -133,30 +133,30 @@ class Poller {
         if ($key + 1 > $this->settings['latency_days']) {
           break;
         }
-        if ($day->low_temperature < $benchmark) {
-          $benchmark = $day->low_temperature;
+        if ($day->low_temperature < $reference) {
+          $reference = $day->low_temperature;
         }
       }
     }
-    return $benchmark;
+    return $reference;
   }
 
   /**
-   * Utility to get target humidity based on benchmark temp.
+   * Utility to get target humidity based on reference temp.
    *
    * @param string $thermostat_id
    *   The UUID of a thermostat.
-   * @param float $benchmark_temp
-   *   The benchmark temp to use when calculating correct humidity step.
+   * @param float $reference_temp
+   *   The reference temp to use when calculating correct humidity step.
    * @return float
    *   The calculated target humidity for the thermostat.
    */
-  protected function getTargetHumidity($thermostat_id, $benchmark_temp) {
+  protected function getTargetHumidity($thermostat_id, $reference_temp) {
     $target_humidity = 0;
     $steps = isset($this->settings['steps'][$thermostat_id]) ? $this->settings['steps'][$thermostat_id] : $this->settings['steps']['default'];
     ksort($steps);
     foreach ($steps as $temp => $target_step) {
-      if ($benchmark_temp > $temp) {
+      if ($reference_temp > $temp) {
         $target_humidity = $target_step;
       }
       else {
