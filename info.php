@@ -9,6 +9,7 @@ try {
 }
 catch (Exception $exc) {
   print '<p>Nest API Connection could not be established. Please your connection and configured credentials.</p>';
+  //var_dump($exc);
 }
 $info = $poller->info();
 $date = date(DATE_RSS);

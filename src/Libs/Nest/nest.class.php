@@ -33,6 +33,7 @@ define('DUALFUEL_BREAKPOINT_ALWAYS_ALT', 'always-alt');
 define('DEVICE_WITH_NO_NAME', 'Not Set');
 define('DEVICE_TYPE_THERMOSTAT', 'thermostat');
 define('DEVICE_TYPE_PROTECT', 'protect');
+define('DEVICE_TYPE_SENSOR', 'sensor');
 
 define('NESTAPI_ERROR_UNDER_MAINTENANCE', 1000);
 define('NESTAPI_ERROR_EMPTY_RESPONSE', 1001);
@@ -54,30 +55,44 @@ define('NESTAPI_ERROR_API_OTHER_ERROR', 1004);
  */
 class Nest
 {
-    const USER_AGENT = 'Nest/2.1.3 CFNetwork/548.0.4';
+    const USER_AGENT = 'Nest/5.0.0.23 (iOScom.nestlabs.jasper.release) os=11.0';
     const PROTOCOL_VERSION = 1;
-    const LOGIN_URL = 'https://home.nest.com/user/login';
+    const LOGIN_URL = 'https://home.nest.com/session';
 
     protected $days_maps = array('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun');
 
+    //Some may be hidden in the Nest applications
     protected $where_map = array(
-        '00000000-0000-0000-0000-000100000000' => 'Entryway',
-        '00000000-0000-0000-0000-000100000001' => 'Basement',
-        '00000000-0000-0000-0000-000100000002' => 'Hallway',
-        '00000000-0000-0000-0000-000100000003' => 'Den',
-        '00000000-0000-0000-0000-000100000004' => 'Attic', // Invisible in web UI
-        '00000000-0000-0000-0000-000100000005' => 'Master Bedroom',
-        '00000000-0000-0000-0000-000100000006' => 'Downstairs',
-        '00000000-0000-0000-0000-000100000007' => 'Garage', // Invisible in web UI
-        '00000000-0000-0000-0000-000100000008' => 'Kids Room',
-        '00000000-0000-0000-0000-000100000009' => 'Garage "Hallway"', // Invisible in web UI
-        '00000000-0000-0000-0000-00010000000a' => 'Kitchen',
-        '00000000-0000-0000-0000-00010000000b' => 'Family Room',
-        '00000000-0000-0000-0000-00010000000c' => 'Living Room',
-        '00000000-0000-0000-0000-00010000000d' => 'Bedroom',
-        '00000000-0000-0000-0000-00010000000e' => 'Office',
-        '00000000-0000-0000-0000-00010000000f' => 'Upstairs',
-        '00000000-0000-0000-0000-000100000010' => 'Dining Room',
+        "00000000-0000-0000-9a4b-de251ffe8dcb" => "Game Room",
+        "00000000-0000-0000-0000-00010000000c" => "Living Room",
+        "00000000-0000-0000-0000-000100000005" => "Master Bedroom",
+        "00000000-0000-0000-0000-000100000013" => "Front Yard",
+        "00000000-0000-0000-0000-000100000001" => "Basement",
+        "00000000-0000-0000-0000-000100000010" => "Dining Room",
+        "00000000-0000-0000-0000-00010000001d" => "Back Door",
+        "00000000-0000-0000-0000-000100000017" => "Deck",
+        "00000000-0000-0000-0000-00010000000b" => "Family Room",
+        "00000000-0000-0000-0000-000100000002" => "Hallway",
+        "00000000-0000-0000-0000-000100000006" => "Downstairs",
+        "00000000-0000-0000-0000-000100000012" => "Driveway",
+        "00000000-0000-0000-0000-000100000009" => "Bathroom",
+        "00000000-0000-0000-0000-00010000001c" => "Side Door",
+        "00000000-0000-0000-0000-00010000000f" => "Upstairs",
+        "00000000-0000-0000-0000-000100000016" => "Shed",
+        "00000000-0000-0000-0000-000100000007" => "Garage",
+        "00000000-0000-0000-0000-00010000000a" => "Kitchen",
+        "00000000-0000-0000-0000-000100000011" => "Backyard",
+        "00000000-0000-0000-0000-00010000001b" => "Front Door",
+        "00000000-0000-0000-0000-000100000015" => "Guest House",
+        "00000000-0000-0000-0000-000100000008" => "Kids Room",
+        "00000000-0000-0000-0000-000100000003" => "Den",
+        "00000000-0000-0000-0000-00010000000e" => "Office",
+        "00000000-0000-0000-0000-000100000004" => "Attic",
+        "00000000-0000-0000-0000-000100000014" => "Outside",
+        "00000000-0000-0000-0000-000100000000" => "Entryway",
+        "00000000-0000-0000-0000-00010000000d" => "Bedroom",
+        "00000000-0000-0000-0000-000100000018" => "Patio",
+        "00000000-0000-0000-0000-00010000001a" => "Guest Room",
     );
 
     protected $transport_url;
@@ -92,30 +107,45 @@ class Nest
     /**
      * Constructor
      *
-     * @param string|null $username Your Nest username.
-     * @param string|null $password Your Nest password.
+     * @param string|null $username    Your Nest username.
+     * @param string|null $password    Your Nest password.
+     * @param string|null $issue_token Issue-token URL
+     * @param string|null $cookies     Google cookies
+     *
+     * @throws InvalidArgumentException|UnexpectedValueException|RuntimeException
      */
-    public function __construct($username = NULL, $password = NULL) {
-        if ($username === NULL && defined('USERNAME')) {
-            $username = USERNAME;
-        }
-        if ($password === NULL && defined('PASSWORD')) {
-            $password = PASSWORD;
-        }
-        if ($username === NULL || $password === NULL) {
-            throw new InvalidArgumentException('Nest credentials were not provided.');
-        }
-        $this->username = $username;
-        $this->password = $password;
+    public function __construct($username = NULL, $password = NULL, $issue_token = NULL, $cookies = NULL) {
+        if (!empty($issue_token)) {
+            $this->issue_token = $issue_token;
+            if (empty($cookies)) {
+                throw new InvalidArgumentException('Google login requires issue_token and cookie.');
+            }
+            $this->cookies = $cookies;
 
-        $this->cookie_file = sys_get_temp_dir() . '/nest_php_cookies_' . md5($username . $password);
+            $this->cookie_file = sys_get_temp_dir() . '/nest_php_cookies_' . md5($this->issue_token);
+            $this->cache_file = sys_get_temp_dir() . '/nest_php_cache_' . md5($this->issue_token);
+        } else {
+            if ($username === NULL && defined('USERNAME')) {
+                $username = USERNAME;
+            }
+            if ($password === NULL && defined('PASSWORD')) {
+                $password = PASSWORD;
+            }
+            if ($username === NULL || $password === NULL) {
+                throw new InvalidArgumentException('Nest credentials were not provided.');
+            }
+            $this->username = $username;
+            $this->password = $password;
+
+            $this->cookie_file = sys_get_temp_dir() . '/nest_php_cookies_' . md5($username . $password);
+            $this->cache_file = sys_get_temp_dir() . '/nest_php_cache_' . md5($username . $password);
+        }
+
         static::secureTouch($this->cookie_file);
-
-        $this->cache_file = sys_get_temp_dir() . '/nest_php_cache_' . md5($username . $password);
+        static::secureTouch($this->cache_file);
 
         // Attempt to load the cache
         $this->loadCache();
-        static::secureTouch($this->cache_file);
 
         // Log in, if needed
         $this->login();
@@ -128,6 +158,8 @@ class Nest
      * @param string $country_code (Optional) Country code
      *
      * @return stdClass
+     *
+     * @throws RuntimeException
      */
     public function getWeather($postal_code, $country_code = NULL) {
         try {
@@ -168,6 +200,9 @@ class Nest
                     $protects[] = $protect->serial_number;
                 }
             }
+            if (empty($protects) && empty($structure->devices)) {
+                continue;
+            }
 
             $weather_data = $this->getWeather($structure->postal_code, $structure->country_code);
             $user_structures[] = (object) array(
@@ -179,7 +214,7 @@ class Nest
                 'outside_temperature' => $weather_data->outside_temperature,
                 'outside_humidity' => $weather_data->outside_humidity,
                 'away' => $structure->away,
-                'away_last_changed' => date(DATETIME_FORMAT, $structure->away_timestamp),
+                'away_last_changed' => !empty($structure->away_timestamp) ? date(DATETIME_FORMAT, $structure->away_timestamp) : NULL,
                 'thermostats' => array_map(array($class_name, 'cleanDevices'), $structure->devices),
                 'protects' => $protects,
             );
@@ -208,9 +243,9 @@ class Nest
             foreach ($scheduled_events as $scheduled_event) {
                 if ($scheduled_event->entry_type == 'setpoint') {
                     $events[(int)$scheduled_event->time] = (object) array(
-                       'time' => $scheduled_event->time/60, // in minutes
-                       'target_temperature' => $scheduled_event->type == 'RANGE' ? array($this->temperatureInUserScale((float)$scheduled_event->{'temp-min'}), $this->temperatureInUserScale((float)$scheduled_event->{'temp-max'})) : $this->temperatureInUserScale((float) $scheduled_event->temp),
-                       'mode' => $scheduled_event->type == 'HEAT' ? TARGET_TEMP_MODE_HEAT : ($scheduled_event->type == 'COOL' ? TARGET_TEMP_MODE_COOL : TARGET_TEMP_MODE_RANGE)
+                        'time' => $scheduled_event->time/60, // in minutes
+                        'target_temperature' => $scheduled_event->type == 'RANGE' ? array($this->temperatureInUserScale((float)$scheduled_event->{'temp-min'}), $this->temperatureInUserScale((float)$scheduled_event->{'temp-max'})) : $this->temperatureInUserScale((float) $scheduled_event->temp),
+                        'mode' => $scheduled_event->type == 'HEAT' ? TARGET_TEMP_MODE_HEAT : ($scheduled_event->type == 'COOL' ? TARGET_TEMP_MODE_COOL : TARGET_TEMP_MODE_RANGE)
                     );
                 }
             }
@@ -256,7 +291,7 @@ class Nest
     /**
      * Get the specified device (thermostat or protect) information.
      *
-     * @param string $serial_number The device (thermostat or protect) serial number. Defaults to the first device of the account.
+     * @param string $serial_number The device (thermostat, sensor, or protect) serial number. Defaults to the first device of the account.
      *
      * @return stdClass
      */
@@ -264,6 +299,7 @@ class Nest
         $this->prepareForGet();
         $serial_number = $this->getDefaultSerial($serial_number);
         $topaz = isset($this->last_status->topaz) ? $this->last_status->topaz : array();
+        $kryptonite = isset($this->last_status->kryptonite) ? $this->last_status->kryptonite : array();
         foreach ($topaz as $protect) {
             if ($serial_number == $protect->serial_number) {
                 // The specified device is a Nest Protect
@@ -317,6 +353,19 @@ class Nest
                     'name' => !empty($protect->description) ? $protect->description : DEVICE_WITH_NO_NAME,
                     'where' => isset($this->where_map[$protect->spoken_where_id]) ? $this->where_map[$protect->spoken_where_id] : $protect->spoken_where_id,
                     'color' => isset($protect->device_external_color) ? $protect->device_external_color : NULL,
+                );
+                return $infos;
+            }
+        }
+        foreach ($kryptonite as $sensor_serial => $sensor) {
+            if ($serial_number == $sensor_serial) {
+                // The specified device is a Nest Sensor
+                $infos = (object) array(
+                    'temperature'           => $this->temperatureInUserScale((float) $sensor->current_temperature),
+                    'battery_level'         => $sensor->battery_level,
+                    'last_status'           => date(DATETIME_FORMAT, $sensor->last_updated_at),
+                    'location'              => $sensor->structure_id,
+                    'where'                 => isset($this->where_map[$sensor->where_id]) ? $this->where_map[$sensor->where_id] : $sensor->where_id,
                 );
                 return $infos;
             }
@@ -382,6 +431,7 @@ class Nest
                 'heat' => $this->last_status->shared->{$serial_number}->hvac_heater_state,
                 'alt_heat' => $this->last_status->shared->{$serial_number}->hvac_alt_heat_state,
                 'fan' => $this->last_status->shared->{$serial_number}->hvac_fan_state,
+                'hot_water' => isset($this->last_status->device->{$serial_number}->has_hot_water_control) ? $this->last_status->device->{$serial_number}->hot_water_active : NULL,
                 'auto_away' => $this->last_status->shared->{$serial_number}->auto_away, // -1 when disabled, 0 when enabled (thermostat can set auto-away), >0 when enabled and active (thermostat is currently in auto-away mode)
                 'manual_away' => $structure_away, //Leaving this for others - but manual away really doesn't exist anymore and should be removed eventually
                 'structure_away' => $structure_away,
@@ -404,6 +454,7 @@ class Nest
                     ),
                 ),
                 'eco_mode' => $eco_mode,
+                'eco_temperatures_assist_enabled' => $this->last_status->device->{$serial_number}->auto_away_enable,
                 'eco_temperatures' => (object) array(
                     'low' => ($this->last_status->device->{$serial_number}->away_temperature_low_enabled) ? $this->temperatureInUserScale((float)$this->last_status->device->{$serial_number}->away_temperature_low) : FALSE,
                     'high' => ($this->last_status->device->{$serial_number}->away_temperature_high_enabled) ? $this->temperatureInUserScale((float)$this->last_status->device->{$serial_number}->away_temperature_high) : FALSE,
@@ -595,7 +646,7 @@ class Nest
      *
      * @return stdClass|bool The object returned by the API call, or FALSE on error.
      *
-     * @throws Exception
+     * @throws InvalidArgumentException
      */
     public function setFanMode($mode, $serial_number = NULL) {
         $duty_cycle = NULL;
@@ -610,10 +661,10 @@ class Nest
                     $timer = (int) $modes[1];
                 }
             } else {
-                throw new Exception("setFanMode(array \$mode[, ...]) needs at least a mode and a value in the \$mode array.");
+                throw new InvalidArgumentException("setFanMode(array \$mode[, ...]) needs at least a mode and a value in the \$mode array.");
             }
         } elseif (!is_string($mode)) {
-            throw new Exception("setFanMode() can only take a string or an array as it's first parameter.");
+            throw new InvalidArgumentException("setFanMode() can only take a string or an array as it's first parameter.");
         }
         return $this->_setFanMode($mode, $duty_cycle, $timer, $serial_number);
     }
@@ -830,10 +881,11 @@ class Nest
         return $this->last_status->device->{$serial_number}->temperature_scale;
     }
 
+
     /**
      * Get all the devices of a specific type from the user's account.
      *
-     * @param string $type DEVICE_TYPE_THERMOSTAT or DEVICE_TYPE_PROTECT.
+     * @param string $type DEVICE_TYPE_THERMOSTAT or DEVICE_TYPE_PROTECT or DEVICE_TYPE_SENSOR
      *
      * @return array Devices
      */
@@ -846,6 +898,9 @@ class Nest
                 $protects[] = $protect->serial_number;
             }
             return $protects;
+        }
+        elseif ($type == DEVICE_TYPE_SENSOR) {
+            return isset($this->last_status->kryptonite) ? array_keys(get_object_vars($this->last_status->kryptonite)) : array();
         }
         $devices_serials = array();
         foreach ($this->last_status->user->{$this->userid}->structures as $structure) {
@@ -907,12 +962,64 @@ class Nest
         );
     }
 
+    /**
+    * Boost hot water.
+    *
+    * @param int  $seconds   Duration of boost.
+    * @param string $serial_number The thermostat serial number. Defaults to the first device of the account.
+    *
+    * @return stdClass|bool The object returned by the API call, or FALSE on error.
+    */
+    public function setHotWaterBoost($boost_in_seconds = 30, $serial_number = NULL) {
+        $serial_number = $this->getDefaultSerial($serial_number);
+        $data = json_encode(array('hot_water_boost_time_to_end' => time() + $boost_in_seconds));
+        return $this->doPOST("/v2/put/device." . $serial_number, $data);
+    }
+
+    /**
+    * Cancel hot water boost. Sets boost timer to zero
+    *
+    * @param string $serial_number The thermostat serial number. Defaults to the first device of the account.
+    *
+    * @return stdClass|bool The object returned by the API call, or FALSE on error.
+    * */
+    public function cancelHotWaterBoost($serial_number = NULL) {
+        return $this->setHotWaterBoost(0,$serial_number);
+    }
+
+
+    /**
+     * Get hot water status
+     *
+     * @param string $serial_number The thermostat serial number. Defaults to the first device of the account.
+     *
+     * @return string.
+     */
+    public function getHotWaterStatus($serial_number = NULL) {
+        $serial_number = $this->getDefaultSerial($serial_number);
+        if ($this->last_status->device->{$serial_number}->has_hot_water_control) {
+                return ($this->last_status->device->{$serial_number}->hot_water_active ? "On" : "Off");
+        } else {
+                return "device has no hot water control";
+        }
+        return "error";
+    }
+
     /* Helper functions */
 
     public function clearStatusCache() {
         unset($this->last_status);
     }
 
+    /**
+     * Load all status information from server.
+     *
+     * @param boolean $retry If needed, rety loading the status from the server a second time.
+     *
+     * @return \stdClass
+     *
+     * @throws RuntimeException
+     */
     public function getStatus($retry = TRUE) {
         $url = "/v3/mobile/" . $this->user;
         $status = $this->doGET($url);
@@ -960,20 +1067,87 @@ class Nest
         }
     }
 
+    /**
+     * Login
+     *
+     * @return void
+     *
+     * @throws UnexpectedValueException|RuntimeException
+     */
     protected function login() {
         if ($this->use_cache()) {
             // No need to login; we'll use cached values for authentication.
             return;
         }
-        $result = $this->doPOST(self::LOGIN_URL, array('username' => $this->username, 'password' => $this->password));
-        if (!isset($result->urls)) {
-            die("Error: Response to login request doesn't contain required transport URL. Response: '" . var_export($result, TRUE) . "'\n");
+        if (!empty($this->issue_token)) {
+            // Get a Bearer token using the Google cookies and issue_token
+            $headers = array(
+                'Sec-Fetch-Mode: cors',
+                'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36',
+                'X-Requested-With: XmlHttpRequest',
+                'Referer: https://accounts.google.com/o/oauth2/iframe',
+                'Cookie: ' . $this->cookies,
+            );
+            $result = $this->doGET($this->issue_token, $headers);
+            if (!isset($result->access_token)) {
+                throw new UnexpectedValueException("Response to login request doesn't contain required access token. Response: " . json_encode($result));
+            }
+
+            // Use Bearer token to get an access token, and user ID
+            $headers = array(
+                'Authorization: Bearer ' . $result->access_token,
+                'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.100 Safari/537.36',
+                'X-Goog-API-Key: AIzaSyAdkSIMNc51XGNEAYWasX9UOWkS5P6sZE4', // Nest website's (public) API key,
+                'Referer: https://home.nest.com',
+            );
+            $params = array(
+                'embed_google_oauth_access_token' => TRUE,
+                'expire_after' => '3600s',
+                'google_oauth_access_token' => $result->access_token,
+                'policy_id' => 'authproxy-oauth-policy',
+            );
+            $result = $this->doPOST("https://nestauthproxyservice-pa.googleapis.com/v1/issue_jwt", $params, $headers);
+            if (empty($result->claims->subject->nestId->id)) {
+                throw new RuntimeException("Response to login request doesn't contain required User ID. Response: " . json_encode($result));
+            }
+            if (empty($result->jwt)) {
+                throw new RuntimeException("Response to login request doesn't contain required (JWT) access token. Response: " . json_encode($result));
+            }
+            $this->userid = $result->claims->subject->nestId->id;
+            $this->access_token = $result->jwt;
+            $this->cache_expiration = strtotime($result->claims->expirationTime);
+
+            // Get user
+            $params = array(
+                'known_bucket_types' => array("user"),
+                'known_bucket_versions' => array(),
+            );
+            $result = $this->doPOST("https://home.nest.com/api/0.1/user/{$this->userid}/app_launch", json_encode($params), array('Content-type: text/json'));
+            if (empty($result->service_urls->urls->transport_url)) {
+                throw new RuntimeException("Response to login request doesn't contain required transport_url. Response: " . json_encode($result));
+            }
+            $this->transport_url = $result->service_urls->urls->transport_url;
+
+            foreach ($result->updated_buckets as $bucket) {
+                if (strpos($bucket->object_key, 'user.') === 0) {
+                    $this->user = $bucket->object_key;
+                    break;
+                }
+            }
+            if (empty($this->user)) {
+                $this->user = "user.{$this->userid}"; // meh; no need to get it from API; it's simple enough!
+            }
+        } else {
+            $result = $this->doPOST(self::LOGIN_URL, array('username' => $this->username, 'password' => $this->password));
+            if (!isset($result->urls)) {
+                throw new RuntimeException("Response to login request doesn't contain required transport URL. Response: " . json_encode($result));
+            }
+            $this->transport_url = $result->urls->transport_url;
+            $this->access_token = $result->access_token;
+            $this->userid = $result->userid;
+            $this->user = $result->user;
+            $this->cache_expiration = strtotime($result->expires_in);
         }
-        $this->transport_url = $result->urls->transport_url;
-        $this->access_token = $result->access_token;
-        $this->userid = $result->userid;
-        $this->user = $result->user;
-        $this->cache_expiration = strtotime($result->expires_in);
         $this->saveCache();
     }
 
@@ -1013,14 +1187,15 @@ class Nest
     /**
      * Send a GET HTTP request.
      *
-     * @param string $url URL
+     * @param string $url     URL
+     * @param array  $headers HTTP headers
      *
      * @return stdClass|bool JSON-decoded object, or boolean if no response was returned.
      *
      * @throws RuntimeException
      */
-    protected function doGET($url) {
-        return $this->doRequest('GET', $url);
+    protected function doGET($url, $headers = array()) {
+        return $this->doRequest('GET', $url, NULL, TRUE, $headers);
     }
 
     /**
@@ -1028,13 +1203,14 @@ class Nest
      *
      * @param string       $url         URL
      * @param array|string $data_fields Data to send via POST.
+     * @param array        $headers     HTTP headers
      *
      * @return stdClass|bool JSON-decoded object, or boolean if no response was returned.
      *
      * @throws RuntimeException
      */
-    protected function doPOST($url, $data_fields) {
-        return $this->doRequest('POST', $url, $data_fields);
+    protected function doPOST($url, $data_fields, $headers = array()) {
+        return $this->doRequest('POST', $url, $data_fields, TRUE, $headers);
     }
 
     /**
@@ -1044,17 +1220,18 @@ class Nest
      * @param string       $url         URL
      * @param array|string $data_fields Data to send via POST.
      * @param bool         $with_retry  Retry if request fails?
+     * @param array        $headers     HTTP headers
      *
      * @return stdClass|bool JSON-decoded object, or boolean if no response was returned.
      *
      * @throws RuntimeException
      */
-    protected function doRequest($method, $url, $data_fields = NULL, $with_retry = TRUE) {
+    protected function doRequest($method, $url, $data_fields = NULL, $with_retry = TRUE, $headers = array()) {
         $ch = curl_init();
         if ($url[0] == '/') {
             $url = $this->transport_url . $url;
         }
-        $headers = array('X-nl-protocol-version: ' . self::PROTOCOL_VERSION);
+        $headers[] = 'X-nl-protocol-version: ' . self::PROTOCOL_VERSION;
         if (isset($this->userid)) {
             $headers[] = 'X-nl-user-id: ' . $this->userid;
             $headers[] = 'Authorization: Basic ' . $this->access_token;
@@ -1085,6 +1262,7 @@ class Nest
             $headers[] = 'Content-length: ' . strlen($data);
         }
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, TRUE); // for security this should always be set to true.
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);    // for security this should always be set to 2.
         curl_setopt($ch, CURLOPT_SSLVERSION, 1);        // Nest servers now require TLSv1; won't work with SSLv2 or even SSLv3!
@@ -1105,16 +1283,20 @@ class Nest
         $info = curl_getinfo($ch);
 
         if ($info['http_code'] == 401 || (!$response && curl_errno($ch) != 0)) {
-            if ($with_retry && $this->use_cache()) {
-                // Received 401, and was using cached data; let's try to re-login and retry.
+            if ($with_retry) {
+                // Received 401; let's re-login then try again this same request
                 @unlink($this->cookie_file);
                 @unlink($this->cache_file);
                 if ($info['http_code'] == 401) {
                     $this->login();
                 }
-                return $this->doRequest($method, $url, $data_fields, !$with_retry);
+                return $this->doRequest($method, $url, $data_fields, FALSE);
             } else {
-                throw new RuntimeException("Error: HTTP request to $url returned an error: " . curl_error($ch), curl_errno($ch));
+                if (curl_errno($ch) != 0) {
+                    throw new RuntimeException("Error: HTTP request to $url returned a cURL error: [" . curl_errno($ch) . "] " . curl_error($ch), curl_errno($ch));
+                } else {
+                    throw new RuntimeException("Error: HTTP request to $url returned an HTTP error code " . $info['http_code'] . ". Response: " . str_replace(array("\n","\r"), '', $response), $info['http_code']);
+                }
             }
         }
 
